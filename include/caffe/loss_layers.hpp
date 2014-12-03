@@ -302,6 +302,36 @@ class EuclideanLossLayer : public LossLayer<Dtype> {
   Blob<Dtype> diff_;
 };
 
+template <typename Dtype>
+class DotProductLossLayer : public LossLayer<Dtype> {
+ public:
+  explicit DotProductLossLayer(const LayerParameter& param)
+      : LossLayer<Dtype>(param), diff_() {}
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+
+  virtual inline LayerParameter_LayerType type() const {
+    return LayerParameter_LayerType_DOTPRODUCT_LOSS;
+  }
+
+  virtual inline bool AllowForceBackward(const int bottom_index) const {
+    return true;
+  }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
+
+  Blob<Dtype> diff_;
+};
+
 /**
  * @brief Computes the hinge loss for a one-of-many classification task.
  *
@@ -748,6 +778,47 @@ class SoftmaxWithLossLayer : public LossLayer<Dtype> {
    *   -# @f$ (N \times 1 \times 1 \times 1) @f$
    *      the labels -- ignored as we can't compute their error gradients
    */
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
+
+  /// The internal SoftmaxLayer used to map predictions to a distribution.
+  shared_ptr<SoftmaxLayer<Dtype> > softmax_layer_;
+  /// prob stores the output probability predictions from the SoftmaxLayer.
+  Blob<Dtype> prob_;
+  /// bottom vector holder used in call to the underlying SoftmaxLayer::Forward
+  vector<Blob<Dtype>*> softmax_bottom_vec_;
+  /// top vector holder used in call to the underlying SoftmaxLayer::Forward
+  vector<Blob<Dtype>*> softmax_top_vec_;
+};
+
+template <typename Dtype>
+class SoftmaxRankingLossLayer : public LossLayer<Dtype> {
+ public:
+  explicit SoftmaxRankingLossLayer(const LayerParameter& param)
+      : LossLayer<Dtype>(param),
+        softmax_layer_(new SoftmaxLayer<Dtype>(param)) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+
+  virtual inline LayerParameter_LayerType type() const {
+    return LayerParameter_LayerType_SOFTRANK_LOSS;
+  }
+  virtual inline int ExactNumBottomBlobs() const { return -1; }
+  virtual inline int MinBottomBlobs() const { return 2; }
+  virtual inline int MaxBottomBlobs() const { return 3; }
+  virtual inline int ExactNumTopBlobs() const { return -1; }
+  virtual inline int MinTopBlobs() const { return 1; }
+  virtual inline int MaxTopBlobs() const { return 2; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
   virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,

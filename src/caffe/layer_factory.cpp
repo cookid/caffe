@@ -195,6 +195,8 @@ Layer<Dtype>* GetLayer(const LayerParameter& param) {
     return GetConvolutionLayer<Dtype>(name, param);
   case LayerParameter_LayerType_DATA:
     return new DataLayer<Dtype>(param);
+  case LayerParameter_LayerType_DOTPRODUCT_LOSS:
+    return new DotProductLossLayer<Dtype>(param);
   case LayerParameter_LayerType_DROPOUT:
     return new DropoutLayer<Dtype>(param);
   case LayerParameter_LayerType_DUMMY_DATA:
@@ -245,6 +247,8 @@ Layer<Dtype>* GetLayer(const LayerParameter& param) {
     return GetSoftmaxLayer<Dtype>(name, param);
   case LayerParameter_LayerType_SOFTMAX_LOSS:
     return new SoftmaxWithLossLayer<Dtype>(param);
+  case LayerParameter_LayerType_SOFTRANK_LOSS:
+    return new SoftmaxRankingLossLayer<Dtype>(param);
   case LayerParameter_LayerType_SPLIT:
     return new SplitLayer<Dtype>(param);
   case LayerParameter_LayerType_TANH:

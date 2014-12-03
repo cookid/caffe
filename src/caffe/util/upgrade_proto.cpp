@@ -462,6 +462,8 @@ LayerParameter_LayerType UpgradeV0LayerType(const string& type) {
     return LayerParameter_LayerType_CONVOLUTION;
   } else if (type == "data") {
     return LayerParameter_LayerType_DATA;
+   } else if (type == "dotproduct_loss") {
+    return LayerParameter_LayerType_DOTPRODUCT_LOSS;
   } else if (type == "dropout") {
     return LayerParameter_LayerType_DROPOUT;
   } else if (type == "euclidean_loss") {
@@ -494,6 +496,8 @@ LayerParameter_LayerType UpgradeV0LayerType(const string& type) {
     return LayerParameter_LayerType_SOFTMAX;
   } else if (type == "softmax_loss") {
     return LayerParameter_LayerType_SOFTMAX_LOSS;
+  } else if (type == "softrank_loss") {
+    return LayerParameter_LayerType_SOFTRANK_LOSS;
   } else if (type == "split") {
     return LayerParameter_LayerType_SPLIT;
   } else if (type == "tanh") {
