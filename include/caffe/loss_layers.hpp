@@ -306,7 +306,7 @@ template <typename Dtype>
 class DotProductLossLayer : public LossLayer<Dtype> {
  public:
   explicit DotProductLossLayer(const LayerParameter& param)
-      : LossLayer<Dtype>(param), diff_() {}
+      : LossLayer<Dtype>(param) {}
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       vector<Blob<Dtype>*>* top);
 
@@ -328,8 +328,6 @@ class DotProductLossLayer : public LossLayer<Dtype> {
       const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
-
-  Blob<Dtype> diff_;
 };
 
 /**
