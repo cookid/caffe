@@ -14,27 +14,27 @@ void SoftmaxRankingLossLayer<Dtype>::LayerSetUp(
   LossLayer<Dtype>::LayerSetUp(bottom, top);
   softmax_bottom_vec_.clear();
   softmax_bottom_vec_.push_back(bottom[0]);
-  softmax_top_vec_.clear();
-  softmax_top_vec_.push_back(&prob_);
-  softmax_layer_->SetUp(softmax_bottom_vec_, &softmax_top_vec_);
+  //softmax_top_vec_.clear();
+  //softmax_top_vec_.push_back(&prob_);
+  //softmax_layer_->SetUp(softmax_bottom_vec_, &softmax_top_vec_);
 }
 
 template <typename Dtype>
 void SoftmaxRankingLossLayer<Dtype>::Reshape(
     const vector<Blob<Dtype>*>& bottom, vector<Blob<Dtype>*>* top) {
   LossLayer<Dtype>::Reshape(bottom, top);
-  softmax_layer_->Reshape(softmax_bottom_vec_, &softmax_top_vec_);
-  if (top->size() >= 2) {
+  //softmax_layer_->Reshape(softmax_bottom_vec_, &softmax_top_vec_);
+  //if (top->size() >= 2) {
     // softmax output
-    (*top)[1]->ReshapeLike(*bottom[0]);
-  }
+  //  (*top)[1]->ReshapeLike(*bottom[0]);
+  //}
 }
 
 template <typename Dtype>
 void SoftmaxRankingLossLayer<Dtype>::Forward_cpu(
     const vector<Blob<Dtype>*>& bottom, vector<Blob<Dtype>*>* top) {
-  // The forward pass computes the softmax prob values.
-  softmax_layer_->Forward(softmax_bottom_vec_, &softmax_top_vec_);
+  //softmax_layer_->Forward(softmax_bottom_vec_, &softmax_top_vec_);
+  int num = bottom[0]->num();
   const Dtype* prob_data = prob_.cpu_data();
   const Dtype* label = bottom[1]->cpu_data();
   int num = prob_.num();
