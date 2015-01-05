@@ -824,12 +824,12 @@ class SoftmaxRankingLossLayer : public LossLayer<Dtype> {
 
   /// The internal SoftmaxLayer used to map predictions to a distribution.
   shared_ptr<SoftmaxLayer<Dtype> > softmax_layer_;
-  /// prob stores the output probability predictions from the SoftmaxLayer.
+  /// prob stores the output probability predictions of positive labeled document from the SoftmaxLayer.
   Blob<Dtype> prob_;
-  /// bottom vector holder used in call to the underlying SoftmaxLayer::Forward
-  vector<Blob<Dtype>*> softmax_bottom_vec_;
-  /// top vector holder used in call to the underlying SoftmaxLayer::Forward
-  vector<Blob<Dtype>*> softmax_top_vec_;
+  /// scale is an intermediate Blob to hold temporary results.
+  Blob<Dtype> scale_;
+  /// sum_multiplier is used to carry out sum using BLAS
+  Blob<Dtype> sum_multiplier_;
 };
 
 }  // namespace caffe

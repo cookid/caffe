@@ -12,73 +12,101 @@ template <typename Dtype>
 void SoftmaxRankingLossLayer<Dtype>::LayerSetUp(
     const vector<Blob<Dtype>*>& bottom, vector<Blob<Dtype>*>* top) {
   LossLayer<Dtype>::LayerSetUp(bottom, top);
-  softmax_bottom_vec_.clear();
-  softmax_bottom_vec_.push_back(bottom[0]);
-  //softmax_top_vec_.clear();
-  //softmax_top_vec_.push_back(&prob_);
-  //softmax_layer_->SetUp(softmax_bottom_vec_, &softmax_top_vec_);
 }
 
 template <typename Dtype>
 void SoftmaxRankingLossLayer<Dtype>::Reshape(
     const vector<Blob<Dtype>*>& bottom, vector<Blob<Dtype>*>* top) {
+  const Dtype* bottom_data;
+  Dtype* prob_data;
+  Dtype* multiplier_data;
+  int num_data = bottom[0]->num();
+  int num_cand = bottom.size(); // number of candidates
+
   LossLayer<Dtype>::Reshape(bottom, top);
-  //softmax_layer_->Reshape(softmax_bottom_vec_, &softmax_top_vec_);
-  //if (top->size() >= 2) {
-    // softmax output
-  //  (*top)[1]->ReshapeLike(*bottom[0]);
-  //}
+
+  sum_multiplier_.Reshape(1, num_cand, 1, 1);
+  multiplier_data = sum_multiplier_.mutable_cpu_data();
+  for (int i = 0; i < sum_multiplier_.count(); ++i) {
+    multiplier_data[i] = 1.;
+  }
+
+  prob_.Reshape(num_data, num_cand, 1, 1);
+  prob_data = prob_.mutable_cpu_data();
+  for (int i = 0; i < num_data; ++i) {
+    for (int j = 0; j < num_cand; ++j) {
+      bottom_data = bottom[j]->cpu_data();
+      prob_data[i * num_cand + j] = bottom_data[i];
+    }
+  }
+
+  scale_.Reshape(1, 1, 1, 1);
 }
 
 template <typename Dtype>
 void SoftmaxRankingLossLayer<Dtype>::Forward_cpu(
     const vector<Blob<Dtype>*>& bottom, vector<Blob<Dtype>*>* top) {
-  //softmax_layer_->Forward(softmax_bottom_vec_, &softmax_top_vec_);
-  int num = bottom[0]->num();
-  const Dtype* prob_data = prob_.cpu_data();
-  const Dtype* label = bottom[1]->cpu_data();
-  int num = prob_.num();
-  int dim = prob_.count() / num;
-  int spatial_dim = prob_.height() * prob_.width();
+  const Dtype* bottom_data;
+  Dtype* prob_data = prob_.mutable_cpu_data();
+  Dtype* scale_data = scale_.mutable_cpu_data();
+  int num_data = bottom[0]->num();
+  int num_cand = bottom.size(); // number of candidates
+  int dim = bottom[0]->count() / num_data;
+
   Dtype loss = 0;
-  for (int i = 0; i < num; ++i) {
-    for (int j = 0; j < spatial_dim; j++) {
-      loss -= log(std::max(prob_data[i * dim +
-          static_cast<int>(label[i * spatial_dim + j]) * spatial_dim + j],
-                           Dtype(FLT_MIN)));
+  for (int i = 0; i < num_data; ++i) {
+    bottom_data = bottom[0]->cpu_data();
+    scale_data[0] = bottom_data[i];
+    for (int j = 0; j < num_cand; ++j) {
+      bottom_data = bottom[j]->cpu_data();
+      scale_data[0] = std::max(scale_data[0], bottom_data[i]);
     }
+    // subtraction: prob_data[i] -= scale_data[0];
+    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_cand, 1,
+        1, -1., sum_multiplier_.cpu_data(), scale_data, 1., prob_data + i * dim);
+    // exponentiation
+    caffe_exp<Dtype>(dim, prob_data + i * dim, prob_data + i * dim);
+    // sum after exp
+    caffe_cpu_gemv<Dtype>(CblasTrans, num_cand, 1, 1.,
+        prob_data + i * dim, sum_multiplier_.cpu_data(), 0., scale_data);
+    // division
+    for (int j = 0; j < num_cand; ++j) {
+      prob_data[i * num_cand + j] /= scale_data[0];
+    }
+    loss -= log(std::max( prob_data[i * num_cand]/scale_data[0], Dtype(FLT_MIN) ));
   }
-  (*top)[0]->mutable_cpu_data()[0] = loss / num / spatial_dim;
-  if (top->size() == 2) {
-    (*top)[1]->ShareData(prob_);
-  }
+  (*top)[0]->mutable_cpu_data()[0] = loss / num_data;
 }
 
 template <typename Dtype>
 void SoftmaxRankingLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     const vector<bool>& propagate_down,
     vector<Blob<Dtype>*>* bottom) {
-  if (propagate_down[1]) {
-    LOG(FATAL) << this->type_name()
-               << " Layer cannot backpropagate to label inputs.";
-  }
+  int num_data = prob_.num();
+  int num_cand = prob_.channels(); // number of candidates
+
   if (propagate_down[0]) {
-    Dtype* bottom_diff = (*bottom)[0]->mutable_cpu_diff();
+    Dtype* bottom_diff;
     const Dtype* prob_data = prob_.cpu_data();
-    caffe_copy(prob_.count(), prob_data, bottom_diff);
-    const Dtype* label = (*bottom)[1]->cpu_data();
-    int num = prob_.num();
-    int dim = prob_.count() / num;
-    int spatial_dim = prob_.height() * prob_.width();
-    for (int i = 0; i < num; ++i) {
-      for (int j = 0; j < spatial_dim; ++j) {
-        bottom_diff[i * dim + static_cast<int>(label[i * spatial_dim + j])
-            * spatial_dim + j] -= 1;
+
+    for (int i = 0; i < num_data; ++i) {
+      for (int j = 0; j < num_cand; ++j) {
+        bottom_diff = (*bottom)[j]->mutable_cpu_diff();
+        bottom_diff[i] = prob_data[i * num_cand + j];
       }
     }
+    
+    bottom_diff = (*bottom)[0]->mutable_cpu_diff(); // clicked doc
+    for (int i = 0; i < num_data; ++i) {
+      bottom_diff[i] -= 1;
+    }
+
     // Scale gradient
     const Dtype loss_weight = top[0]->cpu_diff()[0];
-    caffe_scal(prob_.count(), loss_weight / num / spatial_dim, bottom_diff);
+    for (int j = 0; j < num_cand; ++j) {
+      bottom_diff = (*bottom)[j]->mutable_cpu_diff();
+      caffe_scal(num_cand, loss_weight / num_data, bottom_diff);
+    }
   }
 }
 
